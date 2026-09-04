@@ -1,5 +1,5 @@
 [build]
-  command = "npm ci --prefix commons && npm run build --prefix commons && node scripts/export-netlify.mjs"
+  command = "npm ci --prefix commons --include=dev && npm run build --prefix commons && node scripts/export-netlify.mjs"
   publish = "netlify-dist"
 
 [build.environment]
