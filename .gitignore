@@ -5,6 +5,7 @@ node_modules
 **/.wrangler/
 **/dist/
 github-pages/
+netlify-dist/
 *.log
 .DS_Store
 **/.env

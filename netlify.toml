@@ -1,0 +1,11 @@
+[build]
+  command = "npm ci --prefix commons && npm run build --prefix commons && node scripts/export-netlify.mjs"
+  publish = "netlify-dist"
+
+[build.environment]
+  NODE_VERSION = "22.13.0"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
