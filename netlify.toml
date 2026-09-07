@@ -1,11 +1,12 @@
 [build]
-  command = "npm ci --prefix commons --include=dev && npm run build --prefix commons && node scripts/export-netlify.mjs"
+  command = "npm ci --prefix commons --include=dev && npm run build --prefix commons && node scripts/export-netlify.mjs && node scripts/check-netlify-export.mjs"
   publish = "netlify-dist"
 
 [build.environment]
   NODE_VERSION = "22.13.0"
+  PORTAL_BASE_PATH = "/portal"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/portal/*"
+  to = "/portal/index.html"
   status = 200
