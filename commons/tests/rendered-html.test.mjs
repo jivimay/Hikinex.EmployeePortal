@@ -36,28 +36,7 @@ test("uses the brand as Home and gives every role a Company Updates tab", async 
   assert.doesNotMatch(page, /const nav: View\[\] = \["Home"\]/);
 });
 
-test("restores the September 1 header and keeps Microsoft apps in an accessible welcome dropdown", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.doesNotMatch(page, /<span className="role-badge">/);
-  assert.doesNotMatch(page, /<label className="global-search">/);
-  assert.match(page, /className="microsoft-menu-trigger"/);
-  assert.match(page, /aria-expanded=\{open\}/);
-  assert.match(page, /id="microsoft-app-menu" role="menu"/);
-  assert.match(page, /closeWithEscape/);
-  assert.match(page, /https:\/\/outlook\.office\.com\/mail\//);
-  assert.match(page, /https:\/\/teams\.cloud\.microsoft\//);
-  assert.match(page, /https:\/\/www\.microsoft365\.com\/launch\/onedrive/);
-  assert.match(page, /https:\/\/www\.microsoft365\.com\/launch\/word/);
-  assert.match(page, /https:\/\/www\.microsoft365\.com\/launch\/excel/);
-  assert.match(page, /https:\/\/www\.microsoft365\.com\/launch\/powerpoint/);
-  assert.doesNotMatch(page, /Microsoft Copilot|m365\.cloud\.microsoft\/chat/);
-  assert.match(page, /aria-label="Portal navigation"/);
-  assert.match(page, /aria-expanded=\{menu\}/);
-  assert.match(styles, /\.commons>aside \.brand-home\{position:absolute;left:50%/);
-  assert.doesNotMatch(styles, /September dashboard feedback/);
-  assert.doesNotMatch(page, /Your people and work, together/);
-});
+
 
 test("groups appearance and sign-out actions inside the signed-in profile menu", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -127,7 +106,7 @@ test("keeps role defaults separate and enforces authenticated roles", async () =
   assert.match(page, /role === "Admin" && view === "Admin"/);
   assert.doesNotMatch(page, /Preview role/);
   assert.doesNotMatch(page, /Public read-only review/);
-  assert.doesNotMatch(page, /localStorage/);
+  assert.match(page, /localStorage.getItem\("hikinex-appearance"\)/);
 });
 
 test("offers tenant-scoped Microsoft organizational sign-in", async () => {
@@ -161,55 +140,13 @@ test("rotates an attributed daily thought automatically every calendar day", asy
   assert.match(page, /<DailyQuote \/>/);
 });
 
-test("keeps the Home dashboard focused on pinned apps and the company update", async () => {
-  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(page, /My pinned apps/);
-  assert.match(page, /function CompanyUpdatesCarousel/);
-  assert.match(page, /announcement-carousel/);
-  assert.match(page, /View all →/);
-  assert.match(page, /Previous company update/);
-  assert.match(page, /Next company update/);
-  assert.match(page, /setInterval/);
-  assert.match(page, /className="app-card-link"/);
-  assert.doesNotMatch(page, />Open ↗</);
-  assert.match(styles, /min-height:320px/);
-  assert.match(page, /const canRotate = updates\.length > 1/);
-  assert.match(page, /disabled=\{!canRotate\}/);
-  assert.match(styles, /\.commons\.dark \.request-card/);
-  assert.match(styles, /\.commons\.dark>aside \.profile-menu>\.profile\{/);
-  assert.match(styles, /\.commons\.dark>aside \.profile-menu>\.profile strong\{color:#F4FFFE\}/);
-  assert.match(styles, /\.commons\.dark>aside \.profile-menu>\.profile small\{color:#B8CECD\}/);
-  assert.match(styles, /\.commons\.dark \.welcome \.kicker\{/);
-  assert.match(styles, /color:#8FEAEC/);
-  assert.doesNotMatch(page, /className="panel feed-card"/);
-  assert.doesNotMatch(page, /className="panel quick"/);
-  assert.doesNotMatch(page, /QUICK ACTIONS/);
-  assert.match(page, /Add or pin an App/);
-});
 
-test("keeps the Add or pin card aligned with application cards", async () => {
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(styles, /\.app-tile\{[\s\S]*?min-height:94px/);
-  assert.match(styles, /\.request-card\{width:100%;min-height:94px/);
-});
 
-test("uses one consistent action style for company update links", async () => {
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(styles, /\.announcement-top>button,\.carousel-footer>button\{/);
-  assert.match(styles, /border-radius:999px;background:rgba\(4,230,234,\.12\);color:var\(--aqua\)/);
-});
 
-test("keeps the desktop dashboard compact and dark surfaces consistent", async () => {
-  const styles = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
-  assert.match(styles, /Unified dark surfaces and compact desktop dashboard/);
-  assert.match(styles, /\.commons\.dark \.home-grid>\.span-two,\.commons\.dark \.panel\{/);
-  assert.match(styles, /@media\(min-width:1051px\)/);
-  assert.match(styles, /\.commons \.topbar\{display:none\}/);
-  assert.match(styles, /\.commons \.welcome\{height:310px;min-height:0/);
-  assert.match(styles, /\.commons \.home-grid \.apps-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)\}/);
-  assert.match(styles, /\.app-tile,\.request-card\{min-height:78px/);
-});
+
+
+
+
 
 test("loads and publishes real role-scoped company updates through Supabase", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
@@ -246,4 +183,19 @@ test("creates browser history for internal portal navigation", async () => {
   assert.match(page, /initialView !== "Home" && !window\.history\.state\?\.portalView/);
   assert.match(page, /window\.history\.replaceState\(\{ portalView: "Home" \}/);
   assert.match(page, /window\.history\.pushState\(\{ portalView: initialView \}/);
+});
+
+
+test("Launchpad provides two themes, inline updates and personal shortcuts", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../app/launchpad.css", import.meta.url), "utf8");
+  assert.match(page, /function CompanyUpdatesPreview/);
+  assert.match(page, /Read the full update/);
+  assert.match(page, /personal_apps: validated/);
+  assert.match(page, /readPersonalApps\(session.user.user_metadata/);
+  assert.match(page, /aria-pressed=\{!dark\}/);
+  assert.match(page, /aria-pressed=\{dark\}/);
+  assert.match(styles, /launchpad.dark/);
+  assert.match(styles, /prefers-reduced-motion/);
+  assert.doesNotMatch(page, /CompanyUpdatesCarousel/);
 });

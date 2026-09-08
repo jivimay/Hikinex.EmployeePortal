@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import { accountName } from "../lib/account-name";
+import { personalAppUrl, readPersonalApps, type PersonalApp } from "../lib/personal-apps";
+import { companyLogo, applicationLogos, logoPath } from "../lib/branding";
 
 type Role = "Employee" | "Manager" | "Admin";
 type View = "Home" | "Apps" | "Announcements" | "Feed" | "Groups" | "People" | "Jobs" | "Team" | "Requests" | "Admin";
@@ -142,7 +144,35 @@ function MicrosoftAppsMenu() {
   return <div className="microsoft-menu" ref={menuRef}><button className="microsoft-menu-trigger" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open} aria-controls="microsoft-app-menu"><span className="microsoft-grid-mark" aria-hidden="true"><i /><i /><i /><i /></span><span>Microsoft 365</span><span className="menu-chevron" aria-hidden="true">⌄</span></button>{open && <div className="microsoft-shortcuts welcome-microsoft" id="microsoft-app-menu" role="menu" aria-label="Microsoft apps">{microsoftApps.map((app) => <a key={app.name} href={app.href} target="_blank" rel="noopener noreferrer" role="menuitem" aria-label={`Open ${app.name}`} onClick={() => setOpen(false)}><span className={`microsoft-app-mark ${app.className}`} aria-hidden="true">{app.mark}</span><span>{app.name}</span></a>)}</div>}</div>;
 }
 
-function Brand() { return <div className="brand"><span>H!</span>KINEX<small>EMPLOYEE HUB</small></div>; }
+function Brand() { return <div className="brand">{companyLogo ? <img src={logoPath(companyLogo)} alt="H!KINEX" /> : <><span>H!</span>KINEX</>}<small>YOUR DAILY LAUNCHPAD</small></div>; }
+
+function AppLogo({ app }: { app: Application }) {
+  const [failed, setFailed] = useState(false);
+  const logo = applicationLogos[app.id];
+  return <span className={`app-icon icon-${app.id}`}>{logo && !failed ? <img src={logoPath(logo)} alt="" onError={() => setFailed(true)} /> : app.icon}</span>;
+}
+
+function PersonalApps({ items, onSave, search }: { items: PersonalApp[]; onSave: (items: PersonalApp[]) => Promise<boolean>; search: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (open) input.current?.focus(); }, [open]);
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const validUrl = personalAppUrl(url);
+    if (!name.trim() || !validUrl) { setError("Enter an app name and an http:// or https:// address without embedded credentials."); return; }
+    if (items.length >= 40) { setError("You can save up to 40 personal apps. Remove one to add another."); return; }
+    setBusy(true); setError("");
+    const saved = await onSave([...items, { id: `personal-${crypto.randomUUID()}`, name: name.trim(), url: validUrl }]);
+    setBusy(false);
+    if (saved) { setOpen(false); setName(""); setUrl(""); }
+    else setError("Your app could not be saved. Please try again.");
+  };
+  return <section className="personal-section"><div className="section-head"><div><h2>Made yours</h2><small>Your personal apps, in your own space.</small></div><small>Only you</small></div><div className="personal-grid">{items.filter((item) => `${item.name} ${item.url}`.toLowerCase().includes(search.toLowerCase())).map((item) => <article className="personal-tile" key={item.id}><a href={item.url} target="_blank" rel="noopener noreferrer"><span className="app-icon">{item.name.charAt(0).toUpperCase()}</span><span><strong>{item.name}</strong><small>{new URL(item.url).hostname}</small></span></a><button type="button" aria-label={`Remove ${item.name}`} disabled={busy} onClick={async () => { setBusy(true); await onSave(items.filter((app) => app.id !== item.id)); setBusy(false); }}>×</button></article>)}<button className="personal-add" onClick={() => { setOpen(true); setError(""); }}>＋ Add your own app</button></div>{open && <form className="personal-form" onSubmit={save}><h3>Add your own app</h3><p>A personal shortcut. Access is managed by the destination app.</p><div><label>App name<input ref={input} value={name} onChange={(event) => setName(event.target.value)} required maxLength={40} /></label><label>Website address<input type="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://" required maxLength={2048} /></label></div>{error && <p role="alert">{error}</p>}<button className="primary" disabled={busy}>{busy ? "Saving…" : "Add to my apps"}</button><button type="button" disabled={busy} onClick={() => setOpen(false)}>Cancel</button></form>}</section>;
+}
 
 function PinIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path className="pin-body" d="M8 3h8v8l2 3v3H6v-3l2-3V3Z" /><path className="pin-stem" d="M12 17v5" /></svg>;
@@ -150,7 +180,7 @@ function PinIcon() {
 
 function AppTile({ app, assigned, protectedApp, directory = false, canEdit, pinned = false, onAdd, onAddAndPin, onRemove, onTogglePin }: { app: Application; assigned: boolean; protectedApp: boolean; directory?: boolean; canEdit: boolean; pinned?: boolean; onAdd: (app: Application) => void; onAddAndPin?: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin?: (app: Application) => void }) {
   return <article className={`app-tile ${assigned ? "assigned" : ""} ${pinned ? "pinned-app" : ""}`}>
-    {assigned ? <a className="app-card-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name} in a new tab`}><span className="app-icon">{app.icon}</span><span className="app-copy"><strong>{app.name}</strong><small>{app.description}</small></span></a> : <div className="app-card-content"><span className="app-icon">{app.icon}</span><span className="app-copy"><strong>{app.name}</strong><small>{app.description}</small></span></div>}
+    {assigned ? <a className="app-card-link" href={app.url} target="_blank" rel="noopener noreferrer" aria-label={`Open ${app.name} in a new tab`}><AppLogo app={app} /><span className="app-copy"><strong>{app.name}</strong><small>{app.description}</small></span></a> : <div className="app-card-content"><AppLogo app={app} /><span className="app-copy"><strong>{app.name}</strong><small>{app.description}</small></span></div>}
     <div className="app-actions">
       {assigned && onTogglePin && <button className="pin-app" onClick={() => onTogglePin(app)} disabled={!canEdit} aria-pressed={pinned} aria-label={`${pinned ? "Unpin" : "Pin"} ${app.name} on the dashboard`} title={pinned ? "Unpin from dashboard" : "Pin to dashboard"}><PinIcon /></button>}
       {directory && !assigned && onAddAndPin && <button className="pin-app" onClick={() => onAddAndPin(app)} disabled={!canEdit} aria-pressed="false" aria-label={`Add and pin ${app.name} on the dashboard`} title="Add and pin to dashboard"><PinIcon /></button>}
@@ -161,28 +191,20 @@ function AppTile({ app, assigned, protectedApp, directory = false, canEdit, pinn
   </article>;
 }
 
-function CompanyUpdatesCarousel({ updates, navigate }: { updates: CompanyUpdate[]; navigate: (view: View) => void }) {
-  const [index, setIndex] = useState(0);
-  useEffect(() => { if (index >= updates.length) setIndex(0); }, [index, updates.length]);
-  useEffect(() => {
-    if (updates.length < 2) return;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % updates.length), 8_000);
-    return () => window.clearInterval(timer);
-  }, [updates.length]);
-  const update = updates[index] ?? null;
-  const canRotate = updates.length > 1;
-  return <section className="panel announcement announcement-carousel" aria-label="Company updates carousel" aria-live="polite"><div className="announcement-top"><p className="kicker">COMPANY UPDATES</p><button onClick={() => navigate("Announcements")}>View all →</button></div>{update ? <><span className="date">{updateDate(update.published_at)}</span><h2>{update.title}</h2><p>{update.summary}</p><div className="carousel-footer"><button onClick={() => navigate("Announcements")}>Read update →</button><div className="carousel-controls" aria-label="Choose company update"><button onClick={() => setIndex((current) => (current - 1 + updates.length) % updates.length)} aria-label="Previous company update" disabled={!canRotate}>←</button><span>{index + 1} / {updates.length}</span><button onClick={() => setIndex((current) => (current + 1) % updates.length)} aria-label="Next company update" disabled={!canRotate}>→</button></div></div></> : <div className="announcement-empty"><h2>No company updates yet</h2><p>Published updates will appear here automatically.</p><button onClick={() => navigate("Announcements")}>Open Company Updates →</button></div>}</section>;
+function CompanyUpdatesPreview({ updates, navigate }: { updates: CompanyUpdate[]; navigate: (view: View) => void }) {
+  return <section className="company-preview" aria-label="Company updates"><div className="section-head"><div><h2>Around H!KINEX</h2><small>Company updates, right here.</small></div><button onClick={() => navigate("Announcements")}>All updates</button></div>{updates.length ? <div className="update-preview-grid">{updates.slice(0, 2).map((update) => <article key={update.id}><div className="update-meta"><span>{update.pinned ? "Pinned update" : update.audience === "company" ? "Company news" : update.department}</span><time dateTime={update.published_at}>{updateDate(update.published_at)}</time></div><h3>{update.title}</h3><p>{update.summary}</p><details><summary>Read the full update</summary><div className="update-body">{update.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div></details></article>)}</div> : <div className="updates-empty"><strong>You’re all caught up.</strong><p>Published company updates will appear here.</p></div>}</section>;
 }
 
-function HomeView({ role, displayName, assignedIds, pinnedIds, canEdit, updates, navigate, onAdd, onRemove, onTogglePin }: { role: Role; displayName: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; updates: CompanyUpdate[]; navigate: (view: View) => void; onAdd: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void }) {
-  const profile = roleCopy[role];
-  const visibleApps = apps.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id));
-
+function HomeView({ role, displayName, assignedIds, pinnedIds, canEdit, updates, navigate, onAdd, onRemove, onTogglePin, personalApps, onSavePersonalApps }: { role: Role; displayName: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; updates: CompanyUpdate[]; navigate: (view: View) => void; onAdd: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void; personalApps: PersonalApp[]; onSavePersonalApps: (items: PersonalApp[]) => Promise<boolean> }) {
+  const [search, setSearch] = useState("");
+  const visibleApps = apps.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id) && roleCatalogApps[role].includes(app.id) && `${app.name} ${app.description}`.toLowerCase().includes(search.toLowerCase()));
   return <>
-    <section className="welcome"><div><p className="kicker">H!KINEX COMMONS · {role.toUpperCase()}</p><h1>{displayName ? `Welcome, ${displayName}.` : "Welcome."}</h1><p>{profile.title} · {profile.team}</p>{!displayName && <p>To refresh your name, sign out and continue with Microsoft again.</p>}<DailyQuote /></div><MicrosoftAppsMenu /></section>
-    <div className="home-grid"><section className="panel span-two"><div className="section-head"><div><p className="kicker">WORK</p><h2>My pinned apps</h2><small className="section-hint">Only pinned apps appear here. Use the directory to pin another app.</small></div></div><div className="apps-grid">{visibleApps.map((app) => <AppTile key={app.id} app={app} assigned protectedApp={roleDefaults[role].includes(app.id)} pinned canEdit={canEdit} onAdd={onAdd} onRemove={onRemove} onTogglePin={onTogglePin} />)}<button className="request-card" onClick={() => navigate("Apps")}><span>＋</span><strong>Add or pin an App</strong><small>Browse the approved directory</small></button></div></section>
-      <CompanyUpdatesCarousel updates={updates} navigate={navigate} />
-    </div>
+    <section className="launch-hero"><p className="kicker">{displayName ? `WELCOME, ${displayName.toUpperCase()}` : "YOUR DAY, CONNECTED"}</p><h1>A good day starts here.</h1><p>Your team. Your tools. Your next great thing.</p><label className="launch-search"><span aria-hidden="true">⌕</span><input aria-label="Search your apps" placeholder="Find the app you need…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></section>
+    <div className="launch-quote"><span>A thought for today</span><DailyQuote /></div>
+    <section className="work-section"><div className="section-head"><div><h2>Your work essentials</h2><small>My pinned apps · Selected for your role. Organized by you.</small></div><button onClick={() => navigate("Apps")}>App directory</button></div><div className="apps-grid">{visibleApps.map((app) => <AppTile key={app.id} app={app} assigned protectedApp={roleDefaults[role].includes(app.id)} pinned canEdit={canEdit} onAdd={onAdd} onRemove={onRemove} onTogglePin={onTogglePin} />)}{!visibleApps.length && <p className="app-empty">{search ? "No matching work apps." : "Pin an app from the directory to get started."}</p>}<button className="request-card" onClick={() => navigate("Apps")}><span>＋</span><strong>Add or pin an App</strong><small>Browse your directory</small></button></div></section>
+    <PersonalApps items={personalApps} onSave={onSavePersonalApps} search={search} />
+    <CompanyUpdatesPreview updates={updates} navigate={navigate} />
+    <footer className="launch-footer"><span>H!KINEX Commons</span><span>A place for your work. Space to make it yours.</span></footer>
   </>;
 }
 
@@ -194,7 +216,7 @@ function AppsView({ role, assignedIds, pinnedIds, canEdit, navigate, onAdd, onAd
   const pinnedApps = catalog.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id));
   const groupCount = (group: string) => group === "All" ? catalog.length : catalog.filter((app) => app.group === group).length;
   return <section><PageHead eyebrow="WORK" title="Add an App" copy={canEdit ? `Search the applications approved for the ${role} role. Use the pin to add an app directly to Quick Access.` : "Explore the approved directory in Review mode. Sign in to save applications to Quick Access."} />
-    <section className="directory-quick-access" aria-label="Quick Access"><div><p className="kicker">QUICK ACCESS</p><h2>Your dashboard apps</h2><small>Pinned apps stay available on your dashboard on every signed-in device.</small></div><div className="quick-access-items">{pinnedApps.map((app) => <span key={app.id}><a href={app.url} target="_blank" rel="noopener noreferrer">{app.icon} · {app.name}</a><button onClick={() => onTogglePin(app)} disabled={!canEdit} aria-label={`Remove ${app.name} from Quick Access`}>×</button></span>)}{pinnedApps.length === 0 && <small>No apps pinned yet. Select a pin below to add one.</small>}</div><button className="back-dashboard" onClick={() => navigate("Home")}>View dashboard →</button></section>
+    <section className="directory-quick-access" aria-label="Quick Access"><div><p className="kicker">QUICK ACCESS</p><h2>Your dashboard apps</h2><small>Pinned apps stay available on your dashboard on every signed-in device.</small></div><div className="quick-access-items">{pinnedApps.map((app) => <span key={app.id}><a href={app.url} target="_blank" rel="noopener noreferrer">{app.icon} · {app.name}</a><button onClick={() => onTogglePin(app)} disabled={!canEdit} aria-label={`Remove ${app.name} from Quick Access`}>×</button></span>)}{pinnedApps.length === 0 && <small>No apps pinned yet. Select a pin below to add one.</small>}</div><button className="back-dashboard" onClick={() => navigate("Home")}>View dashboard</button></section>
     <div className="directory-tools"><label aria-label="Search apps by name or category">⌕ <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search apps by name or category" /></label><div>{groups.map((group) => <button className={selected === group ? "active" : ""} onClick={() => setSelected(group)} key={group} aria-pressed={selected === group}>{group}<span>{groupCount(group)}</span></button>)}</div></div><div className="directory-grid">{results.map((app) => <AppTile key={app.id} app={app} assigned={assignedIds.has(app.id)} protectedApp={roleDefaults[role].includes(app.id)} directory pinned={pinnedIds.has(app.id)} canEdit={canEdit} onAdd={onAdd} onAddAndPin={onAddAndPin} onRemove={onRemove} onTogglePin={onTogglePin} />)}</div>{results.length === 0 && <div className="empty-state"><strong>No applications found</strong><span>Try another name or category.</span></div>}</section>;
 }
 
@@ -212,7 +234,7 @@ function AnnouncementsView({ role, department, items, onCreate, notify }: { role
     setDraft({ title: "", summary: "", body: "", audience: role === "Admin" ? "company" : "department", department: role === "Admin" ? null : department });
     setComposer(false);
   };
-  return <section><PageHead eyebrow="COMPANY" title="Company Updates" copy="Published company and department updates, available to the right people automatically." />{role !== "Employee" && <button className="primary page-action" onClick={() => setComposer((open) => !open)}>{composer ? "Close composer" : "＋ Create update"}</button>}{composer && <section className="update-composer" aria-label="Create company update"><div><label>Title<input value={draft.title} maxLength={120} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Clear update title" /></label><label>Short summary<input value={draft.summary} maxLength={220} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} placeholder="One-sentence dashboard summary" /></label></div><label>Complete update<textarea value={draft.body} maxLength={4000} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder="Share the details employees need to know." /></label><div className="composer-footer"><label>Audience<select value={draft.audience} onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value as CompanyUpdateDraft["audience"], department: event.target.value === "company" ? null : department }))} disabled={role === "Manager"}><option value="department">{department || "My department"}</option>{role === "Admin" && <option value="company">Company-wide</option>}</select></label><button className="primary" onClick={publish} disabled={saving}>{saving ? "Publishing…" : "Publish update"}</button></div></section>}<div className="news-list">{items.map((item) => <article key={item.id} className={item.pinned ? "pinned" : ""}><span>{updateDate(item.published_at)}</span><div><p className="kicker">{item.pinned ? "PINNED · " : ""}{item.audience === "company" ? "COMPANY-WIDE" : item.department || "DEPARTMENT"}</p><h2>{item.title}</h2><p>{item.summary}</p>{expanded === item.id && <div className="update-body">{item.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div>}<button onClick={() => setExpanded((current) => current === item.id ? null : item.id)}>{expanded === item.id ? "Close update" : "Open update →"}</button></div></article>)}</div>{items.length === 0 && <div className="empty-state"><strong>No updates have been published</strong><span>New company or department updates will appear here automatically.</span></div>}</section>;
+  return <section><PageHead eyebrow="COMPANY" title="Company Updates" copy="Published company and department updates, available to the right people automatically." />{role !== "Employee" && <button className="primary page-action" onClick={() => setComposer((open) => !open)}>{composer ? "Close composer" : "＋ Create update"}</button>}{composer && <section className="update-composer" aria-label="Create company update"><div><label>Title<input value={draft.title} maxLength={120} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Clear update title" /></label><label>Short summary<input value={draft.summary} maxLength={220} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} placeholder="One-sentence dashboard summary" /></label></div><label>Complete update<textarea value={draft.body} maxLength={4000} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder="Share the details employees need to know." /></label><div className="composer-footer"><label>Audience<select value={draft.audience} onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value as CompanyUpdateDraft["audience"], department: event.target.value === "company" ? null : department }))} disabled={role === "Manager"}><option value="department">{department || "My department"}</option>{role === "Admin" && <option value="company">Company-wide</option>}</select></label><button className="primary" onClick={publish} disabled={saving}>{saving ? "Publishing…" : "Publish update"}</button></div></section>}<div className="news-list">{items.map((item) => <article key={item.id} className={item.pinned ? "pinned" : ""}><span>{updateDate(item.published_at)}</span><div><p className="kicker">{item.pinned ? "PINNED · " : ""}{item.audience === "company" ? "COMPANY-WIDE" : item.department || "DEPARTMENT"}</p><h2>{item.title}</h2><p>{item.summary}</p>{expanded === item.id && <div className="update-body">{item.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div>}<button onClick={() => setExpanded((current) => current === item.id ? null : item.id)}>{expanded === item.id ? "Close update" : "Read full update"}</button></div></article>)}</div>{items.length === 0 && <div className="empty-state"><strong>No updates have been published</strong><span>New company or department updates will appear here automatically.</span></div>}</section>;
 }
 
 function FeedView({ notify }: { notify: (message: string) => void }) {
@@ -242,10 +264,15 @@ function PageHead({ eyebrow, title, copy }: { eyebrow: string; title: string; co
 
 export default function Portal() {
   const [role, setRole] = useState<Role>("Employee");
-  const [view, setView] = useState<View>("Home");
+  const [view, setView] = useState<View>(viewFromLocation);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try { const saved = window.localStorage.getItem("hikinex-appearance"); return saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches; } catch { return false; }
+  });
+  const [personalApps, setPersonalApps] = useState<PersonalApp[]>([]);
+  const changeTheme = (next: boolean) => { setDark(next); try { window.localStorage.setItem("hikinex-appearance", next ? "dark" : "light"); } catch { /* The current session still uses the selected theme. */ } };
   const [session, setSession] = useState<Session | null>(null);
   const [savedName, setSavedName] = useState<{ userId: string; name: unknown } | null>(null);
   const identity = session ? accountName(session.user, savedName) : null;
@@ -284,7 +311,6 @@ export default function Portal() {
       window.history.replaceState({ portalView: "Home" }, "", homeUrl);
       window.history.pushState({ portalView: initialView }, "", sectionUrl);
     }
-    setView(initialView);
     window.addEventListener("popstate", restoreView);
     return () => window.removeEventListener("popstate", restoreView);
   }, []);
@@ -298,7 +324,7 @@ export default function Portal() {
       if (event === "USER_UPDATED") return;
       setProfileReady(false);
       setAuthMessage("");
-      if (!nextSession) { setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
+      if (!nextSession) { setPersonalApps([]); setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -320,6 +346,7 @@ export default function Portal() {
       }
       setRole((storedRole.charAt(0).toUpperCase() + storedRole.slice(1)) as Role);
       setDepartment(profileResult.data?.department || "H!KINEX");
+      setPersonalApps(readPersonalApps(session.user.user_metadata?.personal_apps));
       setView(viewFromLocation());
       if (!assignmentResult.error) setAddedIds((assignmentResult.data ?? []).map((row) => row.application_id));
       if (!updatesResult.error) setCompanyUpdates((updatesResult.data ?? []) as CompanyUpdate[]);
@@ -328,11 +355,21 @@ export default function Portal() {
       const defaultsSeeded = session.user.user_metadata?.dashboard_defaults_version === dashboardDefaultsVersion;
       const initialPins = defaultsSeeded ? validSavedPins : [...new Set([...essentialDashboardApps, ...validSavedPins])];
       setPinnedIds(initialPins);
-      if (!defaultsSeeded) void supabase.auth.updateUser({ data: { pinned_apps: initialPins, dashboard_defaults_seeded: true, dashboard_defaults_version: dashboardDefaultsVersion } });
+      if (!defaultsSeeded) void supabase?.auth.updateUser({ data: { pinned_apps: initialPins, dashboard_defaults_seeded: true, dashboard_defaults_version: dashboardDefaultsVersion } });
       setProfileReady(true);
     });
     return () => { current = false; };
   }, [session]);
+  const savePersonalApps = async (items: PersonalApp[]) => {
+    if (!session || !supabase || !profileReady) return false;
+    const validated = readPersonalApps(items);
+    if (validated.length !== items.length) { notify("Some app details are invalid."); return false; }
+    const { error } = await supabase.auth.updateUser({ data: { personal_apps: validated } });
+    if (error) { notify("We could not save your personal apps. Please try again."); return false; }
+    setPersonalApps(validated);
+    notify("Your personal apps were saved.");
+    return true;
+  };
   const addApp = async (app: Application) => {
     if (!session || !supabase) return;
     if (assignedIds.has(app.id)) return;
@@ -434,6 +471,9 @@ export default function Portal() {
   const signOut = () => {
     setSession(null);
     setSavedName(null);
+    setPersonalApps([]);
+    setPinnedIds([]);
+    setCompanyUpdates([]);
     setAddedIds([]);
     setRole("Employee");
     navigate("Home", true);
@@ -452,18 +492,19 @@ export default function Portal() {
   if (!session) return <main className="auth-page"><section className="auth-card"><Brand /><p className="kicker">SECURE EMPLOYEE ACCESS</p><h1>Welcome to H!KINEX Commons.</h1><p>Sign in with your assigned Employee, Manager, or Admin account. Your account role determines which portal and controls you can access.</p><button className="microsoft microsoft-primary" onClick={signInWithMicrosoft} disabled={authBusy || !isSupabaseConfigured}><span className="microsoft-mark" aria-hidden="true"><i /><i /><i /><i /></span>{authBusy ? "Connecting…" : "Continue with Microsoft"}</button><span className="or">or use your assigned portal credentials</span><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@hikinex.com" /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" onKeyDown={(event) => { if (event.key === "Enter") signIn(); }} /></label>{authMessage && <div className="auth-error" role="alert">{authMessage}</div>}<button className="primary" onClick={signIn} disabled={authBusy || !isSupabaseConfigured}>{authBusy ? "Signing in…" : isSupabaseConfigured ? "Sign in with email" : "Secure access is being connected"}</button><small>Access and roles are managed by H!KINEX.</small></section></main>;
   if (authMessage) return <main className="auth-page"><section className="auth-card"><Brand /><p className="kicker">ACCESS NOT ASSIGNED</p><h1>We couldn’t open your portal.</h1><p>{authMessage}</p><button className="primary" onClick={signOut}>Sign out</button></section></main>;
   const managementAllowed = (role === "Manager" && (view === "Team" || view === "Requests")) || (role === "Admin" && view === "Admin");
-  return <main className={`portal commons ${dark ? "dark" : ""}`}>
+  return <main className={`portal commons launchpad ${dark ? "dark" : ""}`}>
     <aside className={menu ? "open" : ""} aria-label="Portal navigation">
       <button className="brand-home" onClick={() => { navigate("Home"); closeNavigationOnMobile(); }} aria-label="Open dashboard"><Brand /></button>
-      <nav>{nav.map((item) => <button className={view === item ? "active" : ""} onClick={() => { navigate(item); closeNavigationOnMobile(); }} key={item}><span aria-hidden="true">◫</span>{labels[item]}</button>)}</nav>
-      <details className="profile-menu"><summary className="profile"><span>{identity?.initials}</span><div><strong>{identity?.fullName || "Your account"}</strong><small>{roleCopy[role].title}</small></div><b aria-hidden="true">⌄</b></summary><div className="account-menu"><button onClick={() => setDark((current) => !current)} aria-pressed={dark}><span aria-hidden="true">{dark ? "☀" : "◐"}</span><span><strong>{dark ? "Light mode" : "Dark mode"}</strong><small>Change portal appearance</small></span></button><button className="account-signout" onClick={signOut}><span aria-hidden="true">↪</span><span><strong>Sign out</strong><small>End this secure session</small></span></button></div></details>
+      <nav>{nav.map((item) => <button className={view === item ? "active" : ""} onClick={() => { navigate(item); closeNavigationOnMobile(); }} key={item}>{labels[item]}</button>)}</nav>
+      <div className="launch-header-tools"><MicrosoftAppsMenu /><div className="appearance-switch" aria-label="Appearance"><button onClick={() => changeTheme(false)} aria-pressed={!dark}>Light</button><button onClick={() => changeTheme(true)} aria-pressed={dark}>Dark</button></div></div>
+      <details className="profile-menu"><summary className="profile"><span>{identity?.initials}</span><div><strong>{identity?.fullName || "Your account"}</strong><small>{roleCopy[role].title}</small></div><b aria-hidden="true">⌄</b></summary><div className="account-menu"><button onClick={() => changeTheme(!dark)} aria-pressed={dark}><span aria-hidden="true">{dark ? "☀" : "◐"}</span><span><strong>{dark ? "Light mode" : "Dark mode"}</strong><small>Change portal appearance</small></span></button><button className="account-signout" onClick={signOut}><span><strong>Sign out</strong><small>End this secure session</small></span></button></div></details>
       <footer><strong>H!KINEX Commons</strong><small>Secure session</small></footer>
     </aside>
     {menu && <button className="overlay" aria-label="Close navigation" onClick={() => setMenu(false)} />}
     <section className="main">
       <header className="topbar"><button className="menu" onClick={() => setMenu((current) => !current)} aria-label={menu ? "Collapse navigation" : "Expand navigation"} aria-expanded={menu}>☰</button>{role !== "Employee" && <select aria-label="Department" value={department} onChange={(event) => setDepartment(event.target.value)}><option>{role === "Admin" ? "All departments" : department}</option><option>H!KINEX</option><option>Sales</option><option>Recruiting</option><option>Marketing</option><option>IT</option><option>DogFoodDev</option></select>}</header>
       <div className="content">
-        {view === "Home" && <HomeView role={role} displayName={identity?.greetingName ?? ""} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} updates={companyUpdates} navigate={navigate} onAdd={addApp} onRemove={removeApp} onTogglePin={togglePin} />}
+        {view === "Home" && <HomeView role={role} displayName={identity?.greetingName ?? ""} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} updates={companyUpdates} navigate={navigate} onAdd={addApp} onRemove={removeApp} onTogglePin={togglePin} personalApps={personalApps} onSavePersonalApps={savePersonalApps} />}
         {view === "Apps" && <AppsView role={role} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} navigate={navigate} onAdd={addApp} onAddAndPin={addAndPin} onRemove={removeApp} onTogglePin={togglePin} />}
         {view === "Announcements" && <AnnouncementsView role={role} department={department} items={companyUpdates} onCreate={createCompanyUpdate} notify={notify} />}
         {view === "Feed" && <FeedView notify={notify} />}

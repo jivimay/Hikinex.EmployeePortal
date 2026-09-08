@@ -38,3 +38,11 @@ No shared passwords or Supabase service-role credentials belong in this reposito
 - `commons/`
 
 Each folder is a standalone Vinext/React project. Install dependencies and run the local development command documented in its `package.json`.
+
+## Launchpad appearance and logos
+
+The Commons dashboard uses `commons/app/launchpad.css` for the light and dark Launchpad themes. Appearance is a device preference; roles still come from the authenticated `profiles` record. Company updates use the existing audience-scoped database records and can be expanded on the dashboard.
+
+To replace a logo, add the approved artwork under `commons/public/logos/` and set its public-relative path in `commons/lib/branding.ts`. `companyLogo` controls the header; `applicationLogos` maps catalog IDs to logo files. The `/portal` base path is applied automatically. App logos fall back to initials when unset or unavailable.
+
+Personal shortcuts are saved in the current authenticated user's Supabase `personal_apps` metadata, alongside the existing saved-pin preferences. They are validated as HTTP(S) links, capped at 40, and never used as a source of roles or permissions. No database migration is required for this redesign.
