@@ -96,10 +96,10 @@ test("uses the approved app catalog and immediate Add an App language", async ()
 test("keeps role defaults separate and enforces authenticated roles", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   assert.match(page, /Manager: \[\.\.\.employeeDefaults, "reet", "talentdirector"\]/);
-  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker"\]/);
+  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector"\]/);
   assert.match(page, /Employee: \[\.\.\.employeeDefaults, \.\.\.sharedOptionalApps\]/);
   assert.match(page, /Manager: \[\.\.\.employeeDefaults, "reet", "talentdirector", \.\.\.sharedOptionalApps\]/);
-  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker", \.\.\.sharedOptionalApps\]/);
+  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector", \.\.\.sharedOptionalApps\]/);
   assert.match(page, /roleCatalogApps\[role\]\.includes\(app\.id\)/);
   assert.match(page, /profiles"\)\.select\("role, display_name, department"\)/);
   assert.match(page, /role === "Manager" && \(view === "Team" \|\| view === "Requests"\)/);

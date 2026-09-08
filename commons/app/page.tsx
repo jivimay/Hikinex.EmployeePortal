@@ -50,14 +50,14 @@ const dashboardDefaultsVersion = 2;
 const roleDefaults: Record<Role, string[]> = {
   Employee: employeeDefaults,
   Manager: [...employeeDefaults, "reet", "talentdirector"],
-  Admin: [...employeeDefaults, "invsync", "softwaretracker"],
+  Admin: [...employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector"],
 };
 
 const sharedOptionalApps = ["canva", "semrush", "reqev-ats", "dfd-timekeeper"];
 const roleCatalogApps: Record<Role, string[]> = {
   Employee: [...employeeDefaults, ...sharedOptionalApps],
   Manager: [...employeeDefaults, "reet", "talentdirector", ...sharedOptionalApps],
-  Admin: [...employeeDefaults, "invsync", "softwaretracker", ...sharedOptionalApps],
+  Admin: [...employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector", ...sharedOptionalApps],
 };
 
 const people = [
