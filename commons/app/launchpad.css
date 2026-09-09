@@ -24,13 +24,13 @@
 @media(prefers-reduced-motion:reduce){.commons.launchpad .app-tile{transition:none}.commons.launchpad .app-tile:hover{transform:none}}
 
 .commons.launchpad .content:before,.commons.launchpad .daily-quote:after,.commons.launchpad .app-tile:after,.commons.launchpad .page-head h1:after{display:none}
-.commons.launchpad .apps-grid>.app-tile .app-icon,.commons.launchpad .directory-grid>.app-tile .app-icon{background:linear-gradient(145deg,#ffffff22,transparent),#277873;color:#fff}
-.commons.launchpad .apps-grid>.app-tile .icon-timekeeper,.commons.launchpad .directory-grid>.app-tile .icon-timekeeper{background-color:#4872bb}
-.commons.launchpad .apps-grid>.app-tile .icon-lms,.commons.launchpad .directory-grid>.app-tile .icon-lms{background-color:#aa7547}
-.commons.launchpad .apps-grid>.app-tile .icon-vaultwarden,.commons.launchpad .directory-grid>.app-tile .icon-vaultwarden{background-color:#6675a9}
-.commons.launchpad .apps-grid>.app-tile .icon-hiki-it-portal,.commons.launchpad .directory-grid>.app-tile .icon-hiki-it-portal{background-color:#397c8d}
-.commons.launchpad .apps-grid>.app-tile .icon-hubspot,.commons.launchpad .directory-grid>.app-tile .icon-hubspot{background-color:#ad6947}
-.commons.launchpad .apps-grid>.app-tile .icon-canva,.commons.launchpad .directory-grid>.app-tile .icon-canva{background-color:#7657ac}
+.commons.launchpad .apps-grid .app-tile .app-icon,.commons.launchpad .directory-grid>.app-tile .app-icon{background:linear-gradient(145deg,#ffffff22,transparent),#277873;color:#fff}
+.commons.launchpad .apps-grid .app-tile .icon-timekeeper,.commons.launchpad .directory-grid>.app-tile .icon-timekeeper{background-color:#4872bb}
+.commons.launchpad .apps-grid .app-tile .icon-lms,.commons.launchpad .directory-grid>.app-tile .icon-lms{background-color:#aa7547}
+.commons.launchpad .apps-grid .app-tile .icon-vaultwarden,.commons.launchpad .directory-grid>.app-tile .icon-vaultwarden{background-color:#6675a9}
+.commons.launchpad .apps-grid .app-tile .icon-hiki-it-portal,.commons.launchpad .directory-grid>.app-tile .icon-hiki-it-portal{background-color:#397c8d}
+.commons.launchpad .apps-grid .app-tile .icon-hubspot,.commons.launchpad .directory-grid>.app-tile .icon-hubspot{background-color:#ad6947}
+.commons.launchpad .apps-grid .app-tile .icon-canva,.commons.launchpad .directory-grid>.app-tile .icon-canva{background-color:#7657ac}
 
 .shared-editor-toggle { display:flex; justify-content:flex-end; margin-bottom:1rem; }
 .shared-editor-toggle button,.shared-app-list button { border:1px solid var(--line); border-radius:12px; padding:12px 16px; color:inherit; background:var(--surface); cursor:pointer; }
@@ -73,3 +73,18 @@
 .commons.launchpad .personal-pin-all { display:inline-flex; gap:6px; align-items:center; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--surface); color:var(--accent); font:600 14px/20px 'DM Sans',sans-serif; }
 .personal-pin-all svg { width:18px; height:18px; }
 .personal-pin-all .pin-body,.personal-pin-all .pin-stem { fill:none; stroke:currentColor; stroke-width:1.8; }
+
+.commons.launchpad .personal-tile .personal-pin { min-width:30px; width:30px; height:30px; padding:5px; border:0; background:transparent; color:var(--accent); }
+.commons.launchpad .apps-grid,.commons.launchpad .directory-grid,.commons.launchpad .personal-grid { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.pinned-slot { min-width:0; position:relative; }
+.commons.launchpad .apps-grid>.pinned-slot>.app-tile { height:100%; min-height:166px; position:relative; }
+.commons.launchpad .pinned-slot .app-actions { position:absolute; right:10px; top:8px; }
+.commons.launchpad .pinned-slot .app-actions .pin-app { color:var(--accent); }
+.commons.launchpad .pinned-slot .app-actions .pin-body { fill:currentColor; }
+.essentials-tools { display:flex; gap:16px; align-items:center; }
+.reorder-controls { display:flex; align-items:center; justify-content:space-between; gap:4px; padding:6px; background:var(--surface); border:1px solid var(--line); border-radius:10px; }
+.reorder-controls button { width:30px; height:30px; border:0; background:var(--soft); color:var(--accent); border-radius:6px; }
+.reorder-controls span { font-size:12px; color:var(--muted); }
+.pinned-slot[draggable=true] { cursor:grab; padding-bottom:42px; }
+@media(max-width:1000px) { .commons.launchpad .apps-grid,.commons.launchpad .directory-grid,.commons.launchpad .personal-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .commons.launchpad .apps-grid,.commons.launchpad .directory-grid,.commons.launchpad .personal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
