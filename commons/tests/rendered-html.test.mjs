@@ -189,7 +189,7 @@ test("Launchpad provides two themes, inline updates and personal shortcuts", asy
   assert.match(page, /Read the full update/);
   assert.match(page, /personal_apps: validated/);
   assert.match(page, /readPersonalApps\(session.user.user_metadata/);
-  assert.match(page, /aria-pressed=\{!dark\}/);
+  assert.doesNotMatch(page, /className="appearance-switch"/);
   assert.match(page, /aria-pressed=\{dark\}/);
   assert.match(styles, /launchpad.dark/);
   assert.match(styles, /prefers-reduced-motion/);

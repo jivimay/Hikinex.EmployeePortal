@@ -12,3 +12,10 @@ test('untrusted account metadata is bounded and never introduces roles or duplic
   assert.deepEqual(readPersonalApps({role:'admin'}), []);
   assert.equal(readPersonalApps(Array.from({length:41},(_,i)=>({id:`personal-${i}`,name:'App',url:'https://example.com'}))).length,40);
 });
+
+test('personal pin preference survives saving and loading without trusting other metadata', () => {
+  const app = {id:'personal-pin',name:'My app',url:'https://example.com/',pinned:true,role:'admin'};
+  assert.deepEqual(readPersonalApps(readPersonalApps([app])), [{id:app.id,name:app.name,url:app.url,pinned:true}]);
+  assert.equal(readPersonalApps([{...app,pinned:false}])[0].pinned, undefined);
+  assert.equal(readPersonalApps([{...app,pinned:'true'}])[0].pinned, undefined);
+});

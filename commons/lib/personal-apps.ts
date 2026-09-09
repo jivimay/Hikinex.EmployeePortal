@@ -1,4 +1,4 @@
-export type PersonalApp = { id: string; name: string; url: string };
+export type PersonalApp = { id: string; name: string; url: string; pinned?: boolean };
 
 export function personalAppUrl(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 2048) return null;
@@ -19,6 +19,6 @@ export function readPersonalApps(value: unknown): PersonalApp[] {
     const url = personalAppUrl(item.url);
     if (!name || !url) return [];
     seen.add(item.id);
-    return [{ id: item.id, name, url }];
+    return [{ id: item.id, name, url, ...(item.pinned === true ? { pinned: true } : {}) }];
   });
 }

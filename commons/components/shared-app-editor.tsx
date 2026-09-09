@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { mapSharedApp, sharedAppError, type SharedApp } from '../lib/shared-apps';
 
-export function SharedAppEditor({ onSaved }: { onSaved: (app: SharedApp) => void }) {
+export function SharedAppEditor({ initialApp = null, onClose, onSaved }: { initialApp?: SharedApp | null; onClose: () => void; onSaved: (app: SharedApp) => void }) {
   const [items, setItems] = useState<SharedApp[]>([]);
-  const [draft, setDraft] = useState<SharedApp | null>(null);
+  const [draft, setDraft] = useState<SharedApp | null>(initialApp);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -36,7 +36,7 @@ export function SharedAppEditor({ onSaved }: { onSaved: (app: SharedApp) => void
     setItems(current => current.map(app => app.id === saved.id ? saved : app));
     onSaved(saved); setDraft(null); setMessage(`${saved.name} was updated for everyone.`);
   };
-  return <section className="shared-app-editor"><h2>Edit company apps</h2><p>Changes apply to everyone who has access to the app.</p>
+  return <section className="shared-app-editor"><div className="shared-editor-heading"><h2>Edit company apps</h2><button type="button" onClick={onClose} disabled={busy} aria-label="Close app editor">×</button></div><p>Changes apply to everyone who has access to the app.</p>
     {loading && <p role="status">Loading apps…</p>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
     {!draft && <div className="shared-app-list">{items.map(app => <button key={app.id} onClick={() => { setDraft({ ...app }); setError(''); setMessage(''); }}><strong>{app.name}</strong><span>Edit details</span></button>)}</div>}
