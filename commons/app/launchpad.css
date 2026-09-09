@@ -88,3 +88,14 @@
 .pinned-slot[draggable=true] { cursor:grab; padding-bottom:42px; }
 @media(max-width:1000px) { .commons.launchpad .apps-grid,.commons.launchpad .directory-grid,.commons.launchpad .personal-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:600px) { .commons.launchpad .apps-grid,.commons.launchpad .directory-grid,.commons.launchpad .personal-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+.commons.launchpad .essentials-tools button { appearance:none; border:0; background:transparent; padding:8px 0; color:var(--accent); font-family:inherit; font-size:14px; font-weight:600; line-height:20px; cursor:pointer; }
+.commons.launchpad .essentials-tools button:hover { text-decoration:underline; text-underline-offset:4px; }
+.commons.launchpad .pinned-slot[draggable=true] { cursor:grab; padding-bottom:0; }
+.commons.launchpad .pinned-slot[draggable=true]:active { cursor:grabbing; }
+.commons.launchpad .pinned-slot:focus-visible { outline:2px solid var(--accent); outline-offset:4px; border-radius:20px; }
+.commons.launchpad .personal-tile { position:relative; padding:20px 32px 20px 14px; min-height:90px; flex-wrap:nowrap; }
+.commons.launchpad .personal-tile>a { flex:1; min-width:0; }
+.commons.launchpad .personal-tile .personal-pin { position:absolute; top:6px; right:6px; transform:none; min-width:24px; width:24px; height:24px; padding:4px; border:0; border-radius:0; background:none; }
+.commons.launchpad .personal-tile .personal-pin svg { width:16px; height:16px; }
+.commons.launchpad .personal-tile>button:not(.personal-pin) { position:absolute; bottom:6px; right:6px; width:24px; height:24px; padding:4px; }
