@@ -78,7 +78,7 @@ test("matches the working dashboard with one-step Quick Access controls", async 
   assert.match(page, /user_app_assignments/);
   assert.match(page, /pinned_apps: nextPins/);
   assert.match(page, /previous dashboard was restored/);
-  assert.match(page, /roleCatalogApps\[role\]/);
+  assert.match(page, /catalogAppIds\(role, department\)/);
   assert.match(page, /groupCount\(group\)/);
   assert.match(styles, /\.directory-quick-access/);
   assert.match(styles, /\.quick-access-items/);
@@ -95,12 +95,8 @@ test("uses the approved app catalog and immediate Add an App language", async ()
 
 test("keeps role defaults separate and enforces authenticated roles", async () => {
   const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
-  assert.match(page, /Manager: \[\.\.\.employeeDefaults, "reet", "talentdirector"\]/);
-  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector"\]/);
-  assert.match(page, /Employee: \[\.\.\.employeeDefaults, \.\.\.sharedOptionalApps\]/);
-  assert.match(page, /Manager: \[\.\.\.employeeDefaults, "reet", "talentdirector", \.\.\.sharedOptionalApps\]/);
-  assert.match(page, /Admin: \[\.\.\.employeeDefaults, "invsync", "softwaretracker", "reet", "talentdirector", \.\.\.sharedOptionalApps\]/);
-  assert.match(page, /roleCatalogApps\[role\]\.includes\(app\.id\)/);
+  assert.match(page, /catalogAppIds\(role, department\)\.includes\(app\.id\)/);
+  assert.doesNotMatch(page, /aria-label="Department"/);
   assert.match(page, /profiles"\)\.select\("role, display_name, department"\)/);
   assert.match(page, /role === "Manager" && \(view === "Team" \|\| view === "Requests"\)/);
   assert.match(page, /role === "Admin" && view === "Admin"/);
