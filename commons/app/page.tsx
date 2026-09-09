@@ -6,11 +6,13 @@ import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import { accountName } from "../lib/account-name";
 import { defaultAppIds, catalogAppIds, canPublishCompanyWide, canPublishUpdates, canUseShortcut } from "../lib/access";
 import { personalAppUrl, readPersonalApps, type PersonalApp } from "../lib/personal-apps";
+import { SharedAppEditor } from "../components/shared-app-editor";
+import { mapSharedApp, type SharedApp } from "../lib/shared-apps";
 import { companyLogo, applicationLogos, logoPath } from "../lib/branding";
 
 type Role = "Employee" | "Manager" | "Admin";
 type View = "Home" | "Apps" | "Announcements" | "Feed" | "Groups" | "People" | "Jobs" | "Team" | "Requests" | "Admin";
-type Application = { id: string; name: string; description: string; icon: string; group: string; url: string };
+type Application = SharedApp;
 type CompanyUpdate = { id: string; title: string; summary: string; body: string; audience: "company" | "department"; department: string | null; pinned: boolean; published_at: string; created_by: string };
 type CompanyUpdateDraft = Pick<CompanyUpdate, "title" | "summary" | "body" | "audience" | "department">;
 
@@ -28,7 +30,7 @@ function updateDate(value: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(value)).toUpperCase();
 }
 
-const apps: Application[] = [
+const fallbackApps: Application[] = [
   { id: "mission-control", name: "Mission Control", description: "Work overview", icon: "M", group: "H!KINEX", url: "https://mission-control-hikinex.vercel.app" },
   { id: "timekeeper", name: "TimeKeeper", description: "Time tracking", icon: "T", group: "H!KINEX", url: "https://hikinex-timekeeper-web2.vercel.app" },
   { id: "lms", name: "LMS", description: "Learning center", icon: "L", group: "H!KINEX", url: "https://dfd-lms-ten.vercel.app/auth/sign-in?redirectTo=%2Fdashboard" },
@@ -135,9 +137,9 @@ function MicrosoftAppsMenu() {
 function Brand() { return <div className="brand">{companyLogo ? <img src={logoPath(companyLogo)} alt="H!KINEX" /> : <><span>H!</span>KINEX</>}<small>YOUR DAILY LAUNCHPAD</small></div>; }
 
 function AppLogo({ app }: { app: Application }) {
-  const [failed, setFailed] = useState(false);
-  const logo = applicationLogos[app.id];
-  return <span className={`app-icon icon-${app.id}`}>{logo && !failed ? <img src={logoPath(logo)} alt="" onError={() => setFailed(true)} /> : app.icon}</span>;
+  const [failedLogo, setFailedLogo] = useState<string | null>(null);
+  const logo = app.logo_url || applicationLogos[app.id];
+  return <span className={`app-icon icon-${app.id}`}>{logo && failedLogo !== logo ? <img src={app.logo_url || logoPath(logo)} alt="" onError={() => setFailedLogo(logo)} /> : app.icon}</span>;
 }
 
 function PersonalApps({ items, onSave, search }: { items: PersonalApp[]; onSave: (items: PersonalApp[]) => Promise<boolean>; search: string }) {
@@ -183,7 +185,7 @@ function CompanyUpdatesPreview({ updates, navigate }: { updates: CompanyUpdate[]
   return <section className="company-preview" aria-label="Company updates"><div className="section-head"><div><h2>Around H!KINEX</h2><small>Company updates, right here.</small></div><button onClick={() => navigate("Announcements")}>All updates</button></div>{updates.length ? <div className="update-preview-grid">{updates.slice(0, 2).map((update) => <article key={update.id}><div className="update-meta"><span>{update.pinned ? "Pinned update" : update.audience === "company" ? "Company news" : update.department}</span><time dateTime={update.published_at}>{updateDate(update.published_at)}</time></div><h3>{update.title}</h3><p>{update.summary}</p><details><summary>Read the full update</summary><div className="update-body">{update.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div></details></article>)}</div> : <div className="updates-empty"><strong>You’re all caught up.</strong><p>Published company updates will appear here.</p></div>}</section>;
 }
 
-function HomeView({ role, department, displayName, assignedIds, pinnedIds, canEdit, updates, navigate, onAdd, onRemove, onTogglePin, personalApps, onSavePersonalApps }: { role: Role; department: string; displayName: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; updates: CompanyUpdate[]; navigate: (view: View) => void; onAdd: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void; personalApps: PersonalApp[]; onSavePersonalApps: (items: PersonalApp[]) => Promise<boolean> }) {
+function HomeView({ apps, role, department, displayName, assignedIds, pinnedIds, canEdit, updates, navigate, onAdd, onRemove, onTogglePin, personalApps, onSavePersonalApps }: { apps: Application[]; role: Role; department: string; displayName: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; updates: CompanyUpdate[]; navigate: (view: View) => void; onAdd: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void; personalApps: PersonalApp[]; onSavePersonalApps: (items: PersonalApp[]) => Promise<boolean> }) {
   const [search, setSearch] = useState("");
   const visibleApps = apps.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id) && catalogAppIds(role, department).includes(app.id) && `${app.name} ${app.description}`.toLowerCase().includes(search.toLowerCase()));
   return <>
@@ -196,7 +198,7 @@ function HomeView({ role, department, displayName, assignedIds, pinnedIds, canEd
   </>;
 }
 
-function AppsView({ role, department, assignedIds, pinnedIds, canEdit, navigate, onAdd, onAddAndPin, onRemove, onTogglePin }: { role: Role; department: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; navigate: (view: View) => void; onAdd: (app: Application) => void; onAddAndPin: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void }) {
+function AppsView({ apps, role, department, assignedIds, pinnedIds, canEdit, navigate, onAdd, onAddAndPin, onRemove, onTogglePin }: { apps: Application[]; role: Role; department: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; navigate: (view: View) => void; onAdd: (app: Application) => void; onAddAndPin: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void }) {
   const [search, setSearch] = useState(""); const [selected, setSelected] = useState("All");
   const catalog = apps.filter((app) => catalogAppIds(role, department).includes(app.id));
   const groups = ["All", ...Array.from(new Set(catalog.map((app) => app.group)))];
@@ -251,6 +253,9 @@ function ManagementView({ role, view, notify }: { role: Role; view: View; notify
 function PageHead({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <header className="page-head"><p className="kicker">{eyebrow}</p><h1>{title}</h1><p>{copy}</p></header>; }
 
 export default function Portal() {
+  const [apps, setApps] = useState<Application[]>([]);
+  const [canManageApps, setCanManageApps] = useState(false);
+  const [editingApps, setEditingApps] = useState(false);
   const [role, setRole] = useState<Role>("Employee");
   const [view, setView] = useState<View>(viewFromLocation);
   const [menu, setMenu] = useState(false);
@@ -312,7 +317,7 @@ export default function Portal() {
       if (event === "USER_UPDATED") return;
       setProfileReady(false);
       setAuthMessage("");
-      if (!nextSession) { setPersonalApps([]); setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
+      if (!nextSession) { setApps([]); setCanManageApps(false); setEditingApps(false); setPersonalApps([]); setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -323,8 +328,12 @@ export default function Portal() {
       supabase.from("profiles").select("role, display_name, department").eq("user_id", session.user.id).maybeSingle(),
       supabase.from("user_app_assignments").select("application_id").eq("user_id", session.user.id).eq("source", "self_added"),
       supabase.from("company_updates").select("id, title, summary, body, audience, department, pinned, published_at, created_by").eq("published", true).order("pinned", { ascending: false }).order("published_at", { ascending: false }),
-    ]).then(([profileResult, assignmentResult, updatesResult]) => {
+      supabase.from("applications").select("id,name,description,url,category,icon,logo_url,updated_at").order("sort_order"),
+      supabase.rpc("can_edit_portal_apps"),
+    ]).then(([profileResult, assignmentResult, updatesResult, appsResult, editorResult]) => {
       if (!current) return;
+      setCanManageApps(!editorResult.error && editorResult.data === true);
+      setApps(appsResult.error ? [] : (appsResult.data ?? []).map(mapSharedApp));
       setSavedName({ userId: session.user.id, name: profileResult.data?.display_name });
       const storedRole = profileResult.data?.role;
       if (profileResult.error || (storedRole !== "employee" && storedRole !== "manager" && storedRole !== "admin")) {
@@ -339,7 +348,7 @@ export default function Portal() {
       if (!assignmentResult.error) setAddedIds((assignmentResult.data ?? []).map((row) => row.application_id));
       if (!updatesResult.error) setCompanyUpdates((updatesResult.data ?? []) as CompanyUpdate[]);
       const savedPins = session.user.user_metadata?.pinned_apps;
-      const validSavedPins = Array.isArray(savedPins) ? savedPins.filter((id): id is string => typeof id === "string" && apps.some((app) => app.id === id)) : [];
+      const validSavedPins = Array.isArray(savedPins) ? savedPins.filter((id): id is string => typeof id === "string" && fallbackApps.some((app) => app.id === id)) : [];
       const defaultsSeeded = session.user.user_metadata?.dashboard_defaults_version === dashboardDefaultsVersion;
       const initialPins = defaultsSeeded ? validSavedPins : [...new Set([...essentialDashboardApps, ...validSavedPins])];
       setPinnedIds(initialPins);
@@ -493,8 +502,10 @@ export default function Portal() {
     <section className="main">
       <header className="topbar"><button className="menu" onClick={() => setMenu((current) => !current)} aria-label={menu ? "Collapse navigation" : "Expand navigation"} aria-expanded={menu}>☰</button></header>
       <div className="content">
-        {view === "Home" && <HomeView role={role} department={department} displayName={identity?.greetingName ?? ""} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} updates={companyUpdates} navigate={navigate} onAdd={addApp} onRemove={removeApp} onTogglePin={togglePin} personalApps={personalApps} onSavePersonalApps={savePersonalApps} />}
-        {view === "Apps" && <AppsView role={role} department={department} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} navigate={navigate} onAdd={addApp} onAddAndPin={addAndPin} onRemove={removeApp} onTogglePin={togglePin} />}
+        {canManageApps && <div className="shared-editor-toggle"><button onClick={() => setEditingApps(open => !open)} aria-expanded={editingApps}>{editingApps ? "Close app editor" : "Edit company apps"}</button></div>}
+        {canManageApps && editingApps && <SharedAppEditor key={session?.user.id} onSaved={saved => setApps(current => current.map(app => app.id === saved.id ? saved : app))} />}
+        {view === "Home" && <HomeView apps={apps} role={role} department={department} displayName={identity?.greetingName ?? ""} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} updates={companyUpdates} navigate={navigate} onAdd={addApp} onRemove={removeApp} onTogglePin={togglePin} personalApps={personalApps} onSavePersonalApps={savePersonalApps} />}
+        {view === "Apps" && <AppsView apps={apps} role={role} department={department} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} navigate={navigate} onAdd={addApp} onAddAndPin={addAndPin} onRemove={removeApp} onTogglePin={togglePin} />}
         {view === "Announcements" && <AnnouncementsView role={role} department={department} items={companyUpdates} onCreate={createCompanyUpdate} notify={notify} />}
         {view === "Feed" && <FeedView notify={notify} />}
         {view === "Groups" && <GroupsView role={role} notify={notify} />}
