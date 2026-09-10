@@ -24,9 +24,9 @@ const restrictedHosts: Record<string, string> = {
   'reet-hikinex.vercel.app': 'reet',
   'talentdirector.dogfooddevsecure.com': 'talentdirector',
 };
-export function canUseShortcut(url: string, role: PortalRole, department: string) {
+export function canUseShortcut(url: string, role: PortalRole, department: string, allowedIds?: string[]) {
   try {
     const app = restrictedHosts[new URL(url).hostname.toLowerCase()];
-    return !app || defaultAppIds(role, department).includes(app);
+    return !app || (allowedIds ?? defaultAppIds(role, department)).includes(app);
   } catch { return false; }
 }

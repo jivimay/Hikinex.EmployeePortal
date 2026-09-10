@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import { accountName } from "../lib/account-name";
-import { defaultAppIds, catalogAppIds, canPublishCompanyWide, canPublishUpdates, canUseShortcut } from "../lib/access";
+import { canUseShortcut } from "../lib/access";
+import { AccessManagement } from "../components/access-management";
+import { PermissionContext, emptyPermissions, usePortalPermissions, type PortalPermissions } from "../lib/portal-permissions";
 import { personalAppUrl, readPersonalApps, type PersonalApp } from "../lib/personal-apps";
 import { SharedAppEditor } from "../components/shared-app-editor";
 import { mapSharedApp, type SharedApp } from "../lib/shared-apps";
@@ -189,10 +191,11 @@ function CompanyUpdatesPreview({ updates, navigate }: { updates: CompanyUpdate[]
 }
 
 function HomeView({ order, onOrder, apps, role, department, displayName, assignedIds, pinnedIds, canEdit, updates, navigate, onAdd, onRemove, onTogglePin, personalApps, onSavePersonalApps }: { order: string[]; onOrder: (ids: string[]) => Promise<void>; apps: Application[]; role: Role; department: string; displayName: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; updates: CompanyUpdate[]; navigate: (view: View) => void; onAdd: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void; personalApps: PersonalApp[]; onSavePersonalApps: (items: PersonalApp[]) => Promise<boolean> }) {
+  const permissions = usePortalPermissions();
   const [search, setSearch] = useState("");
-  const visibleApps = apps.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id) && catalogAppIds(role, department).includes(app.id) && `${app.name} ${app.description}`.toLowerCase().includes(search.toLowerCase()));
+  const visibleApps = apps.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id) && permissions.catalog.includes(app.id) && `${app.name} ${app.description}`.toLowerCase().includes(search.toLowerCase()));
   const [dragged, setDragged] = useState<string | null>(null);
-  const pinnedPersonal = personalApps.filter(item => item.pinned && canUseShortcut(item.url, role, department) && `${item.name} ${item.url}`.toLowerCase().includes(search.toLowerCase()));
+  const pinnedPersonal = personalApps.filter(item => item.pinned && canUseShortcut(item.url, role, department, permissions.catalog) && `${item.name} ${item.url}`.toLowerCase().includes(search.toLowerCase()));
   const entries = [...visibleApps.map(app => ({ id: app.id, app, personal: false })), ...pinnedPersonal.map(app => ({ id: app.id, app: { ...app, description: "Personal app", icon: app.name.charAt(0).toUpperCase(), group: "Personal" }, personal: true }))].sort((a,b) => {
     const x=order.indexOf(a.id), y=order.indexOf(b.id); return (x<0 ? 9999 : x)-(y<0 ? 9999 : y);
   });
@@ -206,40 +209,42 @@ function HomeView({ order, onOrder, apps, role, department, displayName, assigne
     <div className="launch-quote"><span>A thought for today</span><DailyQuote /></div>
     <section className="work-section"><div className="section-head"><div><h2>Your work essentials</h2><small>My pinned apps · Drag to rearrange.</small></div><div className="essentials-tools"><button onClick={() => navigate("Apps")}>App directory</button></div></div><div className="apps-grid">{entries.map(({id, app, personal}, index) => <div className="pinned-slot" key={id} draggable tabIndex={0} aria-label={`${app.name}. Drag to reorder, or press Alt and an arrow key.`} onKeyDown={event => { if (!event.altKey) return; const next = event.key === "ArrowLeft" ? index-1 : event.key === "ArrowRight" ? index+1 : -1; if(next>=0 && next<entries.length) { event.preventDefault(); move(id,entries[next].id); } }} onDragStart={event => { event.dataTransfer.setData("text/plain",id); event.dataTransfer.effectAllowed="move"; setDragged(id); }} onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect="move"; }} onDrop={event => { event.preventDefault(); if(dragged) move(dragged,id); setDragged(null); }} onDragEnd={() => setDragged(null)}>
       <AppTile app={app} assigned protectedApp pinned canEdit={canEdit} onAdd={onAdd} onRemove={onRemove} onTogglePin={personal ? () => { void onSavePersonalApps(personalApps.map(item => item.id===id ? {...item,pinned:false} : item)); } : onTogglePin} />
-    </div>)}{!visibleApps.length && !personalApps.some(item => item.pinned && canUseShortcut(item.url, role, department)) && <p className="app-empty">{search ? "No matching work apps." : "Pin an app from the directory to get started."}</p>}<button className="request-card" onClick={() => navigate("Apps")}><span>＋</span><strong>Add or pin an App</strong><small>Browse your directory</small></button></div></section>
-    <PersonalApps items={personalApps.filter((item) => canUseShortcut(item.url, role, department))} onSave={onSavePersonalApps} search={search} />
+    </div>)}{!visibleApps.length && !personalApps.some(item => item.pinned && canUseShortcut(item.url, role, department, permissions.catalog)) && <p className="app-empty">{search ? "No matching work apps." : "Pin an app from the directory to get started."}</p>}<button className="request-card" onClick={() => navigate("Apps")}><span>＋</span><strong>Add or pin an App</strong><small>Browse your directory</small></button></div></section>
+    <PersonalApps items={personalApps.filter((item) => canUseShortcut(item.url, role, department, permissions.catalog))} onSave={onSavePersonalApps} search={search} />
     <CompanyUpdatesPreview updates={updates} navigate={navigate} />
     <footer className="launch-footer"><span>H!KINEX Commons</span><span>A place for your work. Space to make it yours.</span></footer>
   </>;
 }
 
-function AppsView({ onEdit, apps, role, department, assignedIds, pinnedIds, canEdit, navigate, onAdd, onAddAndPin, onRemove, onTogglePin }: { onEdit?: (app: Application) => void; apps: Application[]; role: Role; department: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; navigate: (view: View) => void; onAdd: (app: Application) => void; onAddAndPin: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void }) {
+function AppsView({ onEdit, apps, role, assignedIds, pinnedIds, canEdit, navigate, onAdd, onAddAndPin, onRemove, onTogglePin }: { onEdit?: (app: Application) => void; apps: Application[]; role: Role; department: string; assignedIds: Set<string>; pinnedIds: Set<string>; canEdit: boolean; navigate: (view: View) => void; onAdd: (app: Application) => void; onAddAndPin: (app: Application) => void; onRemove: (app: Application) => void; onTogglePin: (app: Application) => void }) {
+  const permissions = usePortalPermissions();
   const [search, setSearch] = useState(""); const [selected, setSelected] = useState("All");
-  const catalog = apps.filter((app) => catalogAppIds(role, department).includes(app.id));
+  const catalog = apps.filter((app) => permissions.catalog.includes(app.id));
   const groups = ["All", ...Array.from(new Set(catalog.map((app) => app.group)))];
   const results = catalog.filter((app) => (selected === "All" || app.group === selected) && `${app.name} ${app.description} ${app.group}`.toLowerCase().includes(search.toLowerCase()));
   const pinnedApps = catalog.filter((app) => assignedIds.has(app.id) && pinnedIds.has(app.id));
   const groupCount = (group: string) => group === "All" ? catalog.length : catalog.filter((app) => app.group === group).length;
   return <section><PageHead eyebrow="WORK" title="Add an App" copy={canEdit ? `Search the applications approved for the ${role} role. Use the pin to add an app directly to Quick Access.` : "Explore the approved directory in Review mode. Sign in to save applications to Quick Access."} />
     <section className="directory-quick-access" aria-label="Quick Access"><div><p className="kicker">QUICK ACCESS</p><h2>Your dashboard apps</h2><small>Pinned apps stay available on your dashboard on every signed-in device.</small></div><div className="quick-access-items">{pinnedApps.map((app) => <span key={app.id}><a href={app.url} target="_blank" rel="noopener noreferrer">{app.icon} · {app.name}</a><button onClick={() => onTogglePin(app)} disabled={!canEdit} aria-label={`Remove ${app.name} from Quick Access`}>×</button></span>)}{pinnedApps.length === 0 && <small>No apps pinned yet. Select a pin below to add one.</small>}</div><button className="back-dashboard" onClick={() => navigate("Home")}>View dashboard</button></section>
-    <div className="directory-tools"><label aria-label="Search apps by name or category">⌕ <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search apps by name or category" /></label><div>{groups.map((group) => <button className={selected === group ? "active" : ""} onClick={() => setSelected(group)} key={group} aria-pressed={selected === group}>{group}<span>{groupCount(group)}</span></button>)}</div></div><div className="directory-grid">{results.map((app) => <AppTile onEdit={onEdit} key={app.id} app={app} assigned={assignedIds.has(app.id)} protectedApp={defaultAppIds(role, department).includes(app.id)} directory pinned={pinnedIds.has(app.id)} canEdit={canEdit} onAdd={onAdd} onAddAndPin={onAddAndPin} onRemove={onRemove} onTogglePin={onTogglePin} />)}</div>{results.length === 0 && <div className="empty-state"><strong>No applications found</strong><span>Try another name or category.</span></div>}</section>;
+    <div className="directory-tools"><label aria-label="Search apps by name or category">⌕ <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search apps by name or category" /></label><div>{groups.map((group) => <button className={selected === group ? "active" : ""} onClick={() => setSelected(group)} key={group} aria-pressed={selected === group}>{group}<span>{groupCount(group)}</span></button>)}</div></div><div className="directory-grid">{results.map((app) => <AppTile onEdit={onEdit} key={app.id} app={app} assigned={assignedIds.has(app.id)} protectedApp={permissions.defaults.includes(app.id)} directory pinned={pinnedIds.has(app.id)} canEdit={canEdit} onAdd={onAdd} onAddAndPin={onAddAndPin} onRemove={onRemove} onTogglePin={onTogglePin} />)}</div>{results.length === 0 && <div className="empty-state"><strong>No applications found</strong><span>Try another name or category.</span></div>}</section>;
 }
 
-function AnnouncementsView({ role, department, items, onCreate, notify }: { role: Role; department: string; items: CompanyUpdate[]; onCreate: (draft: CompanyUpdateDraft) => Promise<boolean>; notify: (message: string) => void }) {
+function AnnouncementsView({ department, items, onCreate, notify }: { role: Role; department: string; items: CompanyUpdate[]; onCreate: (draft: CompanyUpdateDraft) => Promise<boolean>; notify: (message: string) => void }) {
+  const permissions = usePortalPermissions();
   const [composer, setComposer] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(items[0]?.id ?? null);
   const [saving, setSaving] = useState(false);
-  const [draft, setDraft] = useState<CompanyUpdateDraft>({ title: "", summary: "", body: "", audience: canPublishCompanyWide(role, department) ? "company" : "department", department: canPublishCompanyWide(role, department) ? null : department });
+  const [draft, setDraft] = useState<CompanyUpdateDraft>({ title: "", summary: "", body: "", audience: (permissions.publish === "company") ? "company" : "department", department: (permissions.publish === "company") ? null : department });
   const publish = async () => {
     if (!draft.title.trim() || !draft.summary.trim() || !draft.body.trim()) { notify("Add a title, summary, and complete update before publishing."); return; }
     setSaving(true);
     const saved = await onCreate({ ...draft, title: draft.title.trim(), summary: draft.summary.trim(), body: draft.body.trim(), department: draft.audience === "department" ? (draft.department || department) : null });
     setSaving(false);
     if (!saved) return;
-    setDraft({ title: "", summary: "", body: "", audience: canPublishCompanyWide(role, department) ? "company" : "department", department: canPublishCompanyWide(role, department) ? null : department });
+    setDraft({ title: "", summary: "", body: "", audience: (permissions.publish === "company") ? "company" : "department", department: (permissions.publish === "company") ? null : department });
     setComposer(false);
   };
-  return <section><PageHead eyebrow="COMPANY" title="Company Updates" copy="Published company and department updates, available to the right people automatically." />{canPublishUpdates(role, department) && <button className="primary page-action" onClick={() => setComposer((open) => !open)}>{composer ? "Close composer" : "＋ Create update"}</button>}{composer && <section className="update-composer" aria-label="Create company update"><div><label>Title<input value={draft.title} maxLength={120} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Clear update title" /></label><label>Short summary<input value={draft.summary} maxLength={220} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} placeholder="One-sentence dashboard summary" /></label></div><label>Complete update<textarea value={draft.body} maxLength={4000} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder="Share the details employees need to know." /></label><div className="composer-footer"><label>Audience<select value={draft.audience} onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value as CompanyUpdateDraft["audience"], department: event.target.value === "company" ? null : department }))} disabled={!canPublishCompanyWide(role, department)}><option value="department">{department || "My department"}</option>{canPublishCompanyWide(role, department) && <option value="company">Company-wide</option>}</select></label><button className="primary" onClick={publish} disabled={saving}>{saving ? "Publishing…" : "Publish update"}</button></div></section>}<div className="news-list">{items.map((item) => <article key={item.id} className={item.pinned ? "pinned" : ""}><span>{updateDate(item.published_at)}</span><div><p className="kicker">{item.pinned ? "PINNED · " : ""}{item.audience === "company" ? "COMPANY-WIDE" : item.department || "DEPARTMENT"}</p><h2>{item.title}</h2><p>{item.summary}</p>{expanded === item.id && <div className="update-body">{item.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div>}<button onClick={() => setExpanded((current) => current === item.id ? null : item.id)}>{expanded === item.id ? "Close update" : "Read full update"}</button></div></article>)}</div>{items.length === 0 && <div className="empty-state"><strong>No updates have been published</strong><span>New company or department updates will appear here automatically.</span></div>}</section>;
+  return <section><PageHead eyebrow="COMPANY" title="Company Updates" copy="Published company and department updates, available to the right people automatically." />{(permissions.publish !== "none") && <button className="primary page-action" onClick={() => setComposer((open) => !open)}>{composer ? "Close composer" : "＋ Create update"}</button>}{composer && <section className="update-composer" aria-label="Create company update"><div><label>Title<input value={draft.title} maxLength={120} onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} placeholder="Clear update title" /></label><label>Short summary<input value={draft.summary} maxLength={220} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} placeholder="One-sentence dashboard summary" /></label></div><label>Complete update<textarea value={draft.body} maxLength={4000} onChange={(event) => setDraft((current) => ({ ...current, body: event.target.value }))} placeholder="Share the details employees need to know." /></label><div className="composer-footer"><label>Audience<select value={draft.audience} onChange={(event) => setDraft((current) => ({ ...current, audience: event.target.value as CompanyUpdateDraft["audience"], department: event.target.value === "company" ? null : department }))} disabled={!(permissions.publish === "company")}><option value="department">{department || "My department"}</option>{(permissions.publish === "company") && <option value="company">Company-wide</option>}</select></label><button className="primary" onClick={publish} disabled={saving}>{saving ? "Publishing…" : "Publish update"}</button></div></section>}<div className="news-list">{items.map((item) => <article key={item.id} className={item.pinned ? "pinned" : ""}><span>{updateDate(item.published_at)}</span><div><p className="kicker">{item.pinned ? "PINNED · " : ""}{item.audience === "company" ? "COMPANY-WIDE" : item.department || "DEPARTMENT"}</p><h2>{item.title}</h2><p>{item.summary}</p>{expanded === item.id && <div className="update-body">{item.body.split("\n").map((paragraph, index) => paragraph.trim() && <p key={index}>{paragraph}</p>)}</div>}<button onClick={() => setExpanded((current) => current === item.id ? null : item.id)}>{expanded === item.id ? "Close update" : "Read full update"}</button></div></article>)}</div>{items.length === 0 && <div className="empty-state"><strong>No updates have been published</strong><span>New company or department updates will appear here automatically.</span></div>}</section>;
 }
 
 function FeedView({ notify }: { notify: (message: string) => void }) {
@@ -268,6 +273,9 @@ function ManagementView({ role, view, notify }: { role: Role; view: View; notify
 function PageHead({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) { return <header className="page-head"><p className="kicker">{eyebrow}</p><h1>{title}</h1><p>{copy}</p></header>; }
 
 export default function Portal() {
+  const [permissions,setPermissions]=useState<PortalPermissions>(emptyPermissions);
+  const [accessRevision,setAccessRevision]=useState(0);
+  const [accessOpen,setAccessOpen]=useState(false);
   const [apps, setApps] = useState<Application[]>([]);
   const [dashboardOrder, setDashboardOrder] = useState<string[]>([]);
   const [canManageApps, setCanManageApps] = useState(false);
@@ -303,7 +311,7 @@ export default function Portal() {
   const [authBusy, setAuthBusy] = useState(false);
   const notify = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 3200); };
   const canEdit = Boolean(session && supabase);
-  const assignedIds = useMemo(() => new Set([...defaultAppIds(role, department), ...addedIds.filter((id) => catalogAppIds(role, department).includes(id))]), [role, department, addedIds]);
+  const assignedIds = useMemo(() => new Set([...permissions.defaults, ...addedIds.filter((id) => permissions.catalog.includes(id))]), [permissions.defaults, permissions.catalog, addedIds]);
   const pinnedIdSet = useMemo(() => new Set(pinnedIds), [pinnedIds]);
   const nav: View[] = ["Announcements"];
   const navigate = (nextView: View, replace = false) => {
@@ -339,7 +347,7 @@ export default function Portal() {
       if (event === "USER_UPDATED") return;
       setProfileReady(false);
       setAuthMessage("");
-      if (!nextSession) { setApps([]); setCanManageApps(false); setEditingApps(false); setPersonalApps([]); setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
+      if (!nextSession) { setPermissions(emptyPermissions); setAccessOpen(false); setApps([]); setCanManageApps(false); setEditingApps(false); setPersonalApps([]); setAddedIds([]); setPinnedIds([]); setCompanyUpdates([]); setSavedName(null); }
     });
     return () => data.subscription.unsubscribe();
   }, []);
@@ -351,10 +359,11 @@ export default function Portal() {
       supabase.from("user_app_assignments").select("application_id").eq("user_id", session.user.id).eq("source", "self_added"),
       supabase.from("company_updates").select("id, title, summary, body, audience, department, pinned, published_at, created_by").eq("published", true).order("pinned", { ascending: false }).order("published_at", { ascending: false }),
       supabase.from("applications").select("id,name,description,url,category,icon,logo_url,updated_at").order("sort_order"),
-      supabase.rpc("can_edit_portal_apps"),
+      supabase.rpc("my_portal_access"),
     ]).then(([profileResult, assignmentResult, updatesResult, appsResult, editorResult]) => {
       if (!current) return;
-      setCanManageApps(!editorResult.error && editorResult.data === true);
+      setPermissions(editorResult.error ? emptyPermissions : (editorResult.data ?? emptyPermissions));
+      setCanManageApps(!editorResult.error && editorResult.data?.edit_apps === true);
       setApps(appsResult.error ? [] : (appsResult.data ?? []).map(mapSharedApp));
       setSavedName({ userId: session.user.id, name: profileResult.data?.display_name });
       const storedRole = profileResult.data?.role;
@@ -379,7 +388,7 @@ export default function Portal() {
       setProfileReady(true);
     });
     return () => { current = false; };
-  }, [session]);
+  }, [session, accessRevision]);
   const saveDashboardOrder = async (ids: string[]) => {
     if (!supabase || !session) return;
     const previous=dashboardOrder; setDashboardOrder(ids);
@@ -389,7 +398,7 @@ export default function Portal() {
   const savePersonalApps = async (items: PersonalApp[]) => {
     if (!session || !supabase || !profileReady) return false;
     const validated = readPersonalApps(items);
-    if (validated.length !== items.length || validated.some((item) => !canUseShortcut(item.url, role, department))) { notify("Some app details are invalid."); return false; }
+    if (validated.length !== items.length || validated.some((item) => !canUseShortcut(item.url, role, department, permissions.catalog))) { notify("Some app details are invalid."); return false; }
     const { error } = await supabase.auth.updateUser({ data: { personal_apps: validated } });
     if (error) { notify("We could not save your personal apps. Please try again."); return false; }
     setPersonalApps(validated);
@@ -398,14 +407,14 @@ export default function Portal() {
   };
   const addApp = async (app: Application) => {
     if (!session || !supabase) return;
-    if (assignedIds.has(app.id) || !catalogAppIds(role, department).includes(app.id)) return;
+    if (assignedIds.has(app.id) || !permissions.catalog.includes(app.id)) return;
     setAddedIds((current) => [...current, app.id]);
     const { error } = await supabase.from("user_app_assignments").upsert({ user_id: session.user.id, application_id: app.id, source: "self_added" }, { onConflict: "user_id,application_id" });
     if (error) { setAddedIds((current) => current.filter((id) => id !== app.id)); notify("We could not save that app. Your previous selection was restored."); return; }
     notify(`${app.name} was added to My Apps.`);
   };
   const removeApp = async (app: Application) => {
-    if (!session || !supabase || defaultAppIds(role, department).includes(app.id)) return;
+    if (!session || !supabase || permissions.defaults.includes(app.id)) return;
     setAddedIds((current) => current.filter((id) => id !== app.id));
     const { error } = await supabase.from("user_app_assignments").delete().eq("user_id", session.user.id).eq("application_id", app.id).eq("source", "self_added");
     if (error) { setAddedIds((current) => [...new Set([...current, app.id])]); notify("We could not remove that app. Your previous selection was restored."); return; }
@@ -425,7 +434,7 @@ export default function Portal() {
     notify(`${app.name} was ${next.includes(app.id) ? "pinned to" : "unpinned from"} your dashboard.`);
   };
   const addAndPin = async (app: Application) => {
-    if (!catalogAppIds(role, department).includes(app.id)) return;
+    if (!permissions.catalog.includes(app.id)) return;
     if (!session || !supabase || assignedIds.has(app.id)) { if (assignedIds.has(app.id)) await togglePin(app); return; }
     const previousAdded = addedIds;
     const previousPins = pinnedIds;
@@ -451,11 +460,11 @@ export default function Portal() {
     notify(`${app.name} was added and pinned to your dashboard.`);
   };
   const createCompanyUpdate = async (draft: CompanyUpdateDraft) => {
-    if (!session || !supabase || !canPublishUpdates(role, department)) return false;
+    if (!session || !supabase || !(permissions.publish !== "none")) return false;
     const payload = {
       ...draft,
-      audience: canPublishCompanyWide(role, department) ? draft.audience : "department",
-      department: !canPublishCompanyWide(role, department) || draft.audience === "department" ? department : null,
+      audience: (permissions.publish === "company") ? draft.audience : "department",
+      department: !(permissions.publish === "company") || draft.audience === "department" ? department : null,
       created_by: session.user.id,
       published: true,
       published_at: new Date().toISOString(),
@@ -519,18 +528,19 @@ export default function Portal() {
   if (!session) return <main className="auth-page"><section className="auth-card"><Brand /><p className="kicker">SECURE EMPLOYEE ACCESS</p><h1>Welcome to H!KINEX Commons.</h1><p>Sign in with your assigned Employee, Manager, or Admin account. Your account role determines which portal and controls you can access.</p><button className="microsoft microsoft-primary" onClick={signInWithMicrosoft} disabled={authBusy || !isSupabaseConfigured}><span className="microsoft-mark" aria-hidden="true"><i /><i /><i /><i /></span>{authBusy ? "Connecting…" : "Continue with Microsoft"}</button><span className="or">or use your assigned portal credentials</span><label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@hikinex.com" /></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" onKeyDown={(event) => { if (event.key === "Enter") signIn(); }} /></label>{authMessage && <div className="auth-error" role="alert">{authMessage}</div>}<button className="primary" onClick={signIn} disabled={authBusy || !isSupabaseConfigured}>{authBusy ? "Signing in…" : isSupabaseConfigured ? "Sign in with email" : "Secure access is being connected"}</button><small>Access and roles are managed by H!KINEX.</small></section></main>;
   if (authMessage) return <main className="auth-page"><section className="auth-card"><Brand /><p className="kicker">ACCESS NOT ASSIGNED</p><h1>We couldn’t open your portal.</h1><p>{authMessage}</p><button className="primary" onClick={signOut}>Sign out</button></section></main>;
   const managementAllowed = (role === "Manager" && (view === "Team" || view === "Requests")) || (role === "Admin" && view === "Admin");
-  return <main className={`portal commons launchpad ${dark ? "dark" : ""}`}>
+  return <PermissionContext.Provider value={permissions}><main className={`portal commons launchpad ${dark ? "dark" : ""}`}>
     <aside className={menu ? "open" : ""} aria-label="Portal navigation">
       <button className="brand-home" onClick={() => { navigate("Home"); closeNavigationOnMobile(); }} aria-label="Open dashboard"><Brand /></button>
       <nav>{nav.map((item) => <button className={view === item ? "active" : ""} onClick={() => { navigate(item); closeNavigationOnMobile(); }} key={item}>{labels[item]}</button>)}</nav>
       <div className="launch-header-tools"><MicrosoftAppsMenu /></div>
-      <details className="profile-menu"><summary className="profile"><span>{identity?.initials}</span><div><strong>{identity?.fullName || "Your account"}</strong><small>{roleCopy[role].title} · {department}</small></div><b aria-hidden="true">⌄</b></summary><div className="account-menu"><button onClick={() => changeTheme(!dark)} aria-pressed={dark}><span aria-hidden="true">{dark ? "☀" : "◐"}</span><span><strong>{dark ? "Light mode" : "Dark mode"}</strong><small>Change portal appearance</small></span></button><button className="account-signout" onClick={signOut}><span aria-hidden="true">↪</span><span><strong>Sign out</strong><small>End this secure session</small></span></button>{canManageApps && <button onClick={() => openAppEditor()}><span aria-hidden="true"><PencilIcon /></span><span><strong>Edit company apps</strong><small>Update shared app details</small></span></button>}</div></details>
+      <details className="profile-menu"><summary className="profile"><span>{identity?.initials}</span><div><strong>{identity?.fullName || "Your account"}</strong><small>{roleCopy[role].title} · {department}</small></div><b aria-hidden="true">⌄</b></summary><div className="account-menu"><button onClick={() => changeTheme(!dark)} aria-pressed={dark}><span aria-hidden="true">{dark ? "☀" : "◐"}</span><span><strong>{dark ? "Light mode" : "Dark mode"}</strong><small>Change portal appearance</small></span></button><button className="account-signout" onClick={signOut}><span aria-hidden="true">↪</span><span><strong>Sign out</strong><small>End this secure session</small></span></button>{canManageApps && <button onClick={() => openAppEditor()}><span aria-hidden="true"><PencilIcon /></span><span><strong>Edit company apps</strong><small>Update shared app details</small></span></button>}{permissions.manage_access && <button onClick={() => { setAccessOpen(true); document.querySelector(".profile-menu")?.removeAttribute("open"); window.scrollTo({top:0}); }}><span aria-hidden="true">⚙</span><span><strong>Access management</strong><small>Roles and app visibility</small></span></button>}</div></details>
       <footer><strong>H!KINEX Commons</strong><small>Secure session</small></footer>
     </aside>
     {menu && <button className="overlay" aria-label="Close navigation" onClick={() => setMenu(false)} />}
     <section className="main">
       <header className="topbar"><button className="menu" onClick={() => setMenu((current) => !current)} aria-label={menu ? "Collapse navigation" : "Expand navigation"} aria-expanded={menu}>☰</button></header>
       <div className="content">
+        {permissions.manage_access && accessOpen && <AccessManagement onClose={() => setAccessOpen(false)} onSaved={() => { setAccessRevision(value => value + 1); }} />}
         {canManageApps && editingApps && <SharedAppEditor key={`${session?.user.id}-${selectedEditApp?.id || "all"}`} initialApp={selectedEditApp} onClose={() => setEditingApps(false)} onSaved={saved => setApps(current => current.map(app => app.id === saved.id ? saved : app))} />}
         {view === "Home" && <HomeView order={dashboardOrder} onOrder={saveDashboardOrder} apps={apps} role={role} department={department} displayName={identity?.greetingName ?? ""} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} updates={companyUpdates} navigate={navigate} onAdd={addApp} onRemove={removeApp} onTogglePin={togglePin} personalApps={personalApps} onSavePersonalApps={savePersonalApps} />}
         {view === "Apps" && <AppsView onEdit={canManageApps ? openAppEditor : undefined} apps={apps} role={role} department={department} assignedIds={assignedIds} pinnedIds={pinnedIdSet} canEdit={canEdit} navigate={navigate} onAdd={addApp} onAddAndPin={addAndPin} onRemove={removeApp} onTogglePin={togglePin} />}
@@ -543,5 +553,5 @@ export default function Portal() {
       </div>
     </section>
     {toast && <div className="toast" role="status">{toast}<button onClick={() => setToast("")} aria-label="Dismiss">×</button></div>}
-  </main>;
+  </main></PermissionContext.Provider>;
 }

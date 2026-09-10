@@ -18,3 +18,9 @@ for (const role of ['Employee', 'Manager', 'Admin']) {
     });
   }
 }
+
+test('saved portal permissions control restricted personal shortcuts', () => {
+  assert.equal(canUseShortcut('https://reet-hikinex.vercel.app/', 'Employee', 'Sales', ['reet']), true);
+  assert.equal(canUseShortcut('https://reet-hikinex.vercel.app/', 'Admin', 'Management', []), false);
+  assert.equal(canUseShortcut('https://talentdirector.dogfooddevsecure.com/dashboard', 'Employee', 'Training Team', []), false);
+});
