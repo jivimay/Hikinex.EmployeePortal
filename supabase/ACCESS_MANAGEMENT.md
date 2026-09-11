@@ -27,3 +27,18 @@ subset is in `tests/access_management.sql`.
 Full-project lint retains two existing drag-wrapper accessibility errors and
 two image warnings. Type checking retains missing Fetcher/D1Database worker
 types; neither check reported errors in the new access management modules.
+
+## Dialogs and bulk editing
+
+Access management, shared app editing, and update creation use native modal
+dialogs, preserving the dashboard position and restoring keyboard focus on close.
+Bulk edit starts with Leave unchanged for every field and previews the exact
+selected employees and changes. The client merges only chosen app/capability
+changes into each employee's existing settings. Apply migration
+`202609100002_bulk_access.sql` before deploying this version.
+
+`save_portal_access_bulk` uses the same guarded, audited save function inside
+one database transaction. A conflict for any employee cancels the entire batch.
+The live rollback-only test in `tests/bulk_access.sql` passed two-user saves,
+conflict atomicity, duplicate rejection and unauthorized-call rejection.
+Three additional Node tests cover per-user setting preservation and inheritance.

@@ -110,3 +110,12 @@
 .access-profile {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}.access-apps{display:grid;gap:8px;margin-bottom:20px;}.access-apps label{grid-template-columns:1fr 190px;align-items:center;border-bottom:1px solid var(--line);padding:8px 0;}
 .access-review{border:1px solid var(--accent);padding:16px;border-radius:12px;margin:16px 0;}.access-management [role=alert]{color:#b92e40;}
 @media(max-width:760px){.access-layout{grid-template-columns:1fr;}.access-subjects{max-height:200px;}.access-profile{grid-template-columns:1fr;}.access-apps label{grid-template-columns:1fr;}}
+/* Native modal dialogs keep the dashboard in place and contain keyboard focus. */
+.commons.launchpad .portal-dialog { position:fixed; inset:0; width:min(1120px,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 48px); margin:auto; padding:0; border:1px solid var(--line); border-radius:22px; background:var(--surface); color:var(--ink); box-shadow:0 24px 100px #0005; overflow:auto; font:inherit; }
+.portal-dialog::backdrop { background:#10283099; backdrop-filter:blur(5px); }
+.commons.launchpad .portal-dialog .access-management,.commons.launchpad .portal-dialog .shared-app-editor,.commons.launchpad .portal-dialog .update-composer { margin:0; border:0; box-shadow:none; padding:24px; }
+.portal-dialog .shared-editor-heading { position:sticky;top:0;z-index:2;background:var(--surface);padding:8px 0; }
+.access-guide { border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:0 0 20px; }
+.access-guide summary { cursor:pointer;font-weight:600;color:var(--accent); }.access-guide dl { display:grid;grid-template-columns:180px 1fr;gap:12px;font-size:14px;line-height:1.6; }.access-guide dt{font-weight:700;}.access-guide dd{margin:0;}
+.bulk-access fieldset { border:0;padding:0;margin:0;min-width:0; }.bulk-selection{display:flex;gap:8px;margin-top:12px;}.access-management .bulk-person{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:10px;}.access-management .bulk-person input{width:18px;height:18px;flex:none;margin-top:3px;}.bulk-person span{min-width:0;}.bulk-access button:disabled{opacity:.5;cursor:default;}
+@media(max-width:760px){.commons.launchpad .portal-dialog{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:14px;}.access-guide dl{grid-template-columns:1fr;gap:4px;}.access-guide dd{margin-bottom:12px;}}

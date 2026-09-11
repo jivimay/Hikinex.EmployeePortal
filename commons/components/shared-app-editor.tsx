@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { PortalDialog } from './portal-dialog';
 import { supabase } from '../lib/supabase';
 import { mapSharedApp, sharedAppError, type SharedApp } from '../lib/shared-apps';
 
@@ -36,10 +37,10 @@ export function SharedAppEditor({ initialApp = null, onClose, onSaved }: { initi
     setItems(current => current.map(app => app.id === saved.id ? saved : app));
     onSaved(saved); setDraft(null); setMessage(`${saved.name} was updated for everyone.`);
   };
-  return <section className="shared-app-editor"><div className="shared-editor-heading"><h2>Edit company apps</h2><button type="button" onClick={onClose} disabled={busy} aria-label="Close app editor">×</button></div><p>Changes apply to everyone who has access to the app.</p>
+  return <PortalDialog title="Edit company apps" onClose={onClose} busy={busy}><section className="shared-app-editor"><div className="shared-editor-heading"><h2>Edit company apps</h2><button type="button" onClick={onClose} disabled={busy} aria-label="Close app editor">×</button></div><p>Changes apply to everyone who has access to the app.</p>
     {loading && <p role="status">Loading apps…</p>}
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
     {!draft && <div className="shared-app-list">{items.map(app => <button key={app.id} onClick={() => { setDraft({ ...app }); setError(''); setMessage(''); }}><strong>{app.name}</strong><span>Edit details</span></button>)}</div>}
     {draft && <form onSubmit={save}><h3>{draft.name}</h3><label>App name<input required maxLength={80} value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} /></label><label>Description<textarea required maxLength={300} value={draft.description} onChange={e => setDraft({ ...draft, description: e.target.value })} /></label><label>App address<input required type="url" maxLength={2048} value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} /></label><label>Logo image address<input type="url" maxLength={2048} placeholder="https://…" value={draft.logo_url || ''} onChange={e => setDraft({ ...draft, logo_url: e.target.value })} /></label><small>Use a publicly accessible HTTPS image. Leave blank to use the default icon.</small><div><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save for everyone'}</button><button type="button" disabled={busy} onClick={() => { setDraft(null); setError(''); }}>Cancel</button></div></form>}
-  </section>;
+  </section></PortalDialog>;
 }
